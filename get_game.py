@@ -1,3 +1,4 @@
+import os
 import sys
 import pyautogui
 import numpy as np
@@ -36,15 +37,18 @@ def sort_apples(applelist):
         applelist[i*W:(i+1)*W]=np.array(sorted(applelist[i*W:(i+1)*W], key=lambda x:x.x))
     return applelist
  
-def get_game(confidence=0.8):
+def get_game(confidence=0.8, save=False):
     applelist = get_apples(confidence)
     
     assert len(applelist) == N_APPLE, f"Not Enough Apple Found, {len(applelist)} found"
     
     game = sort_apples(applelist)
     game = game.reshape(H, W)
+    if save:
+        n_games = len(os.listdir('./games'))
+        np.save(f'./games/{n_games}.npy', game)
     return game
- 
+
 if __name__ == '__main__':
     confidence = sys.argv[1] if len(sys.argv) > 1 else 0.8
     game = get_game(confidence)
