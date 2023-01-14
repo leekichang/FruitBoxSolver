@@ -23,3 +23,4 @@ if __name__ == '__main__':
         for p in pos:
             pyautogui.click(x=p.left+(p.width/2), y=p.top+(p.height/2), button='left')
             break 
+        
