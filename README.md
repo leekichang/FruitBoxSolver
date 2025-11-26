@@ -7,6 +7,7 @@ FruitBoxSolver automatically plays the FruitBox puzzle game by finding every gro
 - `pyautogui` for on-screen element detection and dragging
 - `numpy` for grid math
 - `tqdm` for dataset generation progress bars (only needed for `generate_dataset.py`)
+- `pulp` for the exact ILP solver (only needed when using `solver="ilp"`)
 
 Install the dependencies with:
 
@@ -53,6 +54,7 @@ You can still select the original strategies via the `solver` argument:
 - `solver="greedy"`/`solver="algorithm1"` – always clear the rectangle with the most non-zero cells.
 - `solver="dfs"` – (default) look several moves ahead. Tweak depth/branching with `depth` and `branch_limit` arguments.
 - `solver="beam"` – run an iterative beam search that keeps only the best few positions at each depth (`branch_limit` controls the beam width). The search repeats until no rectangles remain, so it finishes the board; if a beam step finds no improving path it falls back to the largest-rectangle move.
+- `solver="ilp"` – use an exact Integer Linear Programming formulation to maximize the total cleared apples on the current board. Requires the `pulp` package and a compatible solver backend; it computes a full set of non-overlapping rectangles before executing them.
 
 ## Generating a dataset of boards
 `generate_dataset.py` automates gameplay to build a dataset of captured boards for experimentation.
