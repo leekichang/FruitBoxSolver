@@ -4,6 +4,7 @@ import pyautogui
 import numpy as np
 from get_game import get_game
 
+
 class Game:
     def __init__(self, game, gui=False):
         self.H, self.W = 10, 17
@@ -11,27 +12,28 @@ class Game:
         self.game = game
         self.score = 0
         self.nums = np.ndarray(game.shape)
+        self.total_cells = self.H * self.W
         for i in range(self.H):
             for j in range(self.W):
-                self.nums[i][j]=self.game[i][j].num
-        
+                self.nums[i][j] = self.game[i][j].num
+
     def update(self, i, y, j, x):
-        for idx in range(y+1):
-            for jdx in range(x+1):
-                self.game[i+idx][j+jdx].num = self.nums[i+idx][j+jdx]
-                
+        for idx in range(y + 1):
+            for jdx in range(x + 1):
+                self.game[i + idx][j + jdx].num = self.nums[i + idx][j + jdx]
+
     def print_game(self):
-        print(f'Score: {self.score}')
+        print(f"Score: {self.score}")
         print()
         for i in range(self.H):
             for j in range(self.W):
                 if self.game[i][j].num == 0:
-                    print(' ', end=' ')
+                    print(" ", end=" ")
                 else:
-                    print(f'{int(self.game[i][j].num)}', end=' ')
+                    print(f"{int(self.game[i][j].num)}", end=" ")
             print()
         print()
-    
+
     def drag(self, sx, sy, ex, ey):
         start_x = (self.game[sx][sy].x + self.game[sx][sy].endx)//2
         start_y = (self.game[sx][sy].y + self.game[sx][sy].endy)//2
@@ -43,137 +45,144 @@ class Game:
         #    math.sqrt(((ex-sx)**2) + ((ey-sy)**2))*0.5, button='left')
         pyautogui.dragTo(end_x, end_y,\
             math.sqrt(((ex-sx)**2) + ((ey-sy)**2))*0.5, button='left')
-        print(self.game[sx][sy].x+5, self.game[sx][sy].y+5, '->', self.game[ex][ey].endx-5, self.game[ex][ey].endy-5)
-    
-    def solve(self, solver='basic'):
-        #self.print_game()
-        if solver=='basic':     # naive approach
-            new = True
-            while new == True:
-                new = False
-                for i in range(self.H):
-                    for j in range(self.W):
-                        sum = 0
-                        x, y = 0, 0
-                        while sum <= 10 and i+y+1 < self.H+1:
-                            while sum <= 10 and j+x+1 < self.W+1:
-                                if self.nums[i, j] == 0:
-                                    pass
-                                else:
-                                    sum = np.sum(self.nums[i:i+y+1, j:j+x+1])
-                                    if sum == 10:
-                                        if self.is_gui:
-                                            self.drag(sx=i, sy=j, ex=i+y, ey=j+x)
-                                        self.score += len(np.nonzero(self.nums[i:i+y+1, j:j+x+1].reshape(-1))[0])
-                                        self.nums[i:i+y+1, j:j+x+1] = np.zeros(self.nums[i:i+y+1, j:j+x+1].shape)
-                                        self.update(i, y, j, x)
-                                        new = True
-                                        self.print_game()
-                                x += 1
-                            y += 1
-                            x = 0
-                            sum = np.sum(self.nums[i:i+y+1, j:j+x+1])
-                            
-        elif solver=='algorithm1':
-            new = True
-            while new == True:
-                new = False
-                tens_idxs = []
-                for i in range(self.H):
-                    for j in range(self.W):
-                        sum = 0
-                        x, y = 0, 0
-                        while sum <= 10 and i+y+1 < self.H+1:
-                            while sum <= 10 and j+x+1 < self.W+1:
-                                if self.nums[i, j] == 0:
-                                    pass
-                                else:
-                                    sum = np.sum(self.nums[i:i+y+1, j:j+x+1])
-                                    if sum == 10:
-                                        tens_idxs.append([i, i+y+1, j, j+x+1])      
-                                        new = True
-                                x += 1
-                            y += 1
-                            x = 0
-                            sum = np.sum(self.nums[i:i+y+1, j:j+x+1])
-                if new == True:
-                    best_box_score = -1
-                    best_box_idx = []
-                    for idx in tens_idxs:
-                        i, l, j, k = idx
-                        s = len(np.nonzero(self.nums[i:l, j:k].reshape(-1))[0])
-                        if s > best_box_score:
-                            best_box_score = s
-                            best_box_idx = idx
-                    i, l, j, k = best_box_idx
-                    if self.is_gui:
-                        self.drag(sx=i, sy=j, ex=l-1, ey=k-1)
-                    self.score += best_box_score
-                    self.nums[i:l, j:k] = np.zeros(self.nums[i:l, j:k].shape)
-                    self.update(i, l-i-1, j, k-j-1)
-                    #self.print_game()
+        print(f'Dragged from ({sx}, {sy}) to ({ex}, {ey})')
+
+    def _compute_prefix_sums(self, nums: np.ndarray) -> np.ndarray:
+        return np.cumsum(nums, axis=0)
+
+    def _rectangle_sum(self, prefix: np.ndarray, top: int, bottom: int) -> np.ndarray:
+        if top == 0:
+            return prefix[bottom]
+        return prefix[bottom] - prefix[top - 1]
+
+    def _find_ten_rectangles(self, nums: np.ndarray):
+        prefix = self._compute_prefix_sums(nums)
+        for top in range(self.H):
+            for bottom in range(top, self.H):
+                col_sums = self._rectangle_sum(prefix, top, bottom)
+                left = 0
+                current_sum = 0
+                for right, value in enumerate(col_sums):
+                    current_sum += value
+                    while current_sum > 10 and left <= right:
+                        current_sum -= col_sums[left]
+                        left += 1
+                    while current_sum == 10 and left <= right:
+                        cleared_cells = int(
+                            np.count_nonzero(nums[top : bottom + 1, left : right + 1])
+                        )
+                        if cleared_cells > 0:
+                            yield (top, bottom, left, right, cleared_cells)
+                        current_sum -= col_sums[left]
+                        left += 1
+
+    def _hash_board(self, nums: np.ndarray) -> bytes:
+        return nums.tobytes()
+
+    def _search(self, nums: np.ndarray, depth: int, memo: dict, branch_limit: int = 4):
+        key = (self._hash_board(nums), depth)
+        if key in memo:
+            return memo[key]
+
+        cleared_so_far = self.total_cells - int(np.count_nonzero(nums))
+        moves = sorted(self._find_ten_rectangles(nums), key=lambda m: m[4])
+        if depth == 0 or not moves:
+            memo[key] = (cleared_so_far, None)
+            return memo[key]
+
+        best_score = cleared_so_far
+        best_move = None
+        for top, bottom, left, right, _ in moves[:branch_limit]:
+            child = np.array(nums, copy=True)
+            child[top : bottom + 1, left : right + 1] = 0
+            child_score, _ = self._search(child, depth - 1, memo, branch_limit)
+            if child_score > best_score:
+                best_score = child_score
+                best_move = (top, bottom, left, right)
+        memo[key] = (best_score, best_move)
+        return memo[key]
+
+    def _apply_move(self, move):
+        top, bottom, left, right = move
+        cleared_cells = int(np.count_nonzero(self.nums[top : bottom + 1, left : right + 1]))
+        self.score += cleared_cells
+        self.nums[top : bottom + 1, left : right + 1] = 0
+        self.update(top, bottom - top, left, right - left)
+        if self.is_gui:
+            self.drag(sx=top, sy=left, ex=bottom, ey=right)
+        return cleared_cells
+
+    def _basic_solver(self):
+        while True:
+            moves = list(self._find_ten_rectangles(self.nums))
+            if not moves:
+                break
+            top, bottom, left, right, _ = moves[0]
+            self._apply_move((top, bottom, left, right))
+        return self.score
+
+    def _greedy_solver(self):
+        while True:
+            moves = list(self._find_ten_rectangles(self.nums))
+            if not moves:
+                break
+            best_move = max(moves, key=lambda m: m[4])
+            top, bottom, left, right, _ = best_move
+            self._apply_move((top, bottom, left, right))
+        return self.score
+
+    def _dfs_solver(self, depth: int = 4, branch_limit: int = 4):
+        memo = {}
+        while True:
+            _, best_move = self._search(self.nums, depth, memo, branch_limit)
+            if best_move is None:
+                break
+            self._apply_move(best_move)
+        return self.score
+
+    def solve(self, solver="dfs", depth: int = 4, branch_limit: int = 4):
+        if solver == "basic":
+            return self._basic_solver()
+        if solver in ("algorithm1", "greedy"):
+            return self._greedy_solver()
+        if solver == "dfs":
+            return self._dfs_solver(depth=depth, branch_limit=branch_limit)
+        raise ValueError(f"Unknown solver type: {solver}")
+
+
 def get_idxs(game):
-    tens_idxs = []
-    for i in range(game.H):
-        for j in range(game.W):
-            sum = 0
-            x, y = 0, 0
-            while sum <= 10 and i+y+1 < game.H+1:
-                while sum <= 10 and j+x+1 < game.W+1:
-                    if game.nums[i, j] == 0:
-                        pass
-                    else:
-                        sum = np.sum(game.nums[i:i+y+1, j:j+x+1])
-                        if sum == 10:
-                            tens_idxs.append([i, i+y+1, j, j+x+1])
-                    x += 1
-                y += 1
-                x = 0
-                sum = np.sum(game.nums[i:i+y+1, j:j+x+1])
-    return tens_idxs
+    return [idx[:4] for idx in game._find_ten_rectangles(game.nums)]
+
 
 def greedy(tens_idxs, game, depth=0):
     scores = []
     if len(tens_idxs) > 1:
-    #    print(f"len={len(tens_idxs)}")
-        for jdx, idx in enumerate(tens_idxs):
+        for idx in tens_idxs:
             copy_game = copy.deepcopy(game)
             i, l, j, k = idx
-            copy_game.score += len(np.nonzero(copy_game.nums[i:l, j:k].reshape(-1))[0])
-            copy_game.nums[i:l, j:k] = np.zeros(copy_game.nums[i:l, j:k].shape)
-            copy_game.update(i, l-i-1, j, k-j-1)
+            copy_game._apply_move((i, l, j, k))
             depth += 1
-            copy_game.solve('basic')
+            copy_game.solve("basic")
             scores.append(copy_game.score)
-            #scores.append(copy_game.score)
     else:
-        #game.solve(solver='basic')
         print(scores)
-    #print(max(scores), scores.index(max(scores)), len(scores))
     return scores.index(max(scores)), max(scores)
-       
-if __name__ == '__main__':
-    game = Game(get_game(confidence=0.975), True)
-    # c_game = copy.deepcopy(game)
-    
-    # c_game.solve()
-    # print(f'Naive: {c_game.score}')
-    
+
+
+if __name__ == "__main__":
+    game = Game(get_game(confidence=0.975), False)
+    c_game = copy.deepcopy(game)
+    c_game.solve("basic")
+    print(f"Naive: {c_game.score}")
+
     best_score = 0
     idxs = get_idxs(game)
     while len(idxs) > 10:
         idxs = get_idxs(game)
         dx, s = greedy(idxs, game)
-        i,l,j,k = idxs[dx]
-        game.score += len(np.nonzero(game.nums[i:l, j:k].reshape(-1))[0])
-        game.nums[i:l, j:k] = np.zeros(game.nums[i:l, j:k].shape)
-        game.update(i, l-i-1, j, k-j-1)
+        i, l, j, k = idxs[dx]
+        game._apply_move((i, l, j, k))
         if s == best_score:
             break
         best_score = s
-    print(f'Greedy:{best_score}')
-    #import copy
-    #game1 = copy.deepcopy(game)
-    #game.solve(solver='basic')
-    #game1.solve(solver='algorithm1')
-    #print(game.score, game1.score)
+    print(f"Greedy:{best_score}")
