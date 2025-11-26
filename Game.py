@@ -1,3 +1,4 @@
+import importlib
 import math
 import copy
 import pyautogui
@@ -160,6 +161,51 @@ class Game:
                     self._apply_move(move)
         return self.score
 
+    def _ilp_solver(self):
+        if importlib.util.find_spec("pulp") is None:
+            raise ModuleNotFoundError(
+                "The ILP solver requires the 'pulp' package. Install it with 'pip install pulp'."
+            )
+
+        import pulp
+
+        rectangles = list(self._find_ten_rectangles(self.nums))
+        if not rectangles:
+            return self.score
+
+        problem = pulp.LpProblem("fruitbox", pulp.LpMaximize)
+        decision_vars = {
+            idx: pulp.LpVariable(f"x_{idx}", lowBound=0, upBound=1, cat="Binary")
+            for idx in range(len(rectangles))
+        }
+
+        problem += pulp.lpSum(rectangles[idx][4] * decision_vars[idx] for idx in decision_vars)
+
+        for row in range(self.H):
+            for col in range(self.W):
+                if self.nums[row, col] == 0:
+                    continue
+                overlapping = [
+                    idx
+                    for idx, (top, bottom, left, right, _) in enumerate(rectangles)
+                    if top <= row <= bottom and left <= col <= right
+                ]
+                if overlapping:
+                    problem += pulp.lpSum(decision_vars[idx] for idx in overlapping) <= 1
+
+        problem.solve(pulp.PULP_CBC_CMD(msg=False))
+
+        chosen = [
+            rectangles[idx]
+            for idx in decision_vars
+            if pulp.value(decision_vars[idx]) is not None and pulp.value(decision_vars[idx]) > 0.5
+        ]
+
+        for top, bottom, left, right, _ in sorted(chosen, key=lambda r: (r[4], r[0], r[2])):
+            self._apply_move((top, bottom, left, right))
+
+        return self.score
+
     def _apply_move(self, move):
         top, bottom, left, right = move
         cleared_cells = int(np.count_nonzero(self.nums[top : bottom + 1, left : right + 1]))
@@ -207,6 +253,8 @@ class Game:
             return self._dfs_solver(depth=depth, branch_limit=branch_limit)
         if solver == "beam":
             return self._beam_solver(depth=depth, beam_width=branch_limit)
+        if solver == "ilp":
+            return self._ilp_solver()
         raise ValueError(f"Unknown solver type: {solver}")
 
 
