@@ -41,7 +41,17 @@ Use `Game.py` to solve the currently visible board. Set `gui=True` to perform re
 python Game.py
 ```
 
-The script compares a naive solver with a greedy variant that selects the largest-scoring 10-sum region at each step and prints their scores. When GUI control is enabled, `pyautogui` drags over each chosen region in the game window.
+The default solver now performs a depth-limited DFS with branch pruning and state caching:
+
+- It enumerates all rectangles that sum to 10 using prefix sums for fast scanning.
+- It explores only the four rectangles that clear the fewest tiles at each depth (branch limit = 4).
+- Repeated board states are memoized, so the search does not recompute equivalent positions.
+
+You can still select the original strategies via the `solver` argument:
+
+- `solver="basic"` – consume moves in discovery order.
+- `solver="greedy"`/`solver="algorithm1"` – always clear the rectangle with the most non-zero cells.
+- `solver="dfs"` – (default) look several moves ahead. Tweak depth/branching with `depth` and `branch_limit` arguments.
 
 ## Generating a dataset of boards
 `generate_dataset.py` automates gameplay to build a dataset of captured boards for experimentation.
