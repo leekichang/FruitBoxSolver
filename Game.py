@@ -105,8 +105,8 @@ class Game:
     def _heuristic_cleared(self, nums: np.ndarray) -> int:
         return self.total_cells - int(np.count_nonzero(nums))
 
-    def _beam_solver(self, depth: int = 6, beam_width: int = 24):
-        frontier = [(self._heuristic_cleared(self.nums), self.nums.copy(), [])]
+    def _beam_step(self, nums: np.ndarray, depth: int, beam_width: int):
+        frontier = [(self._heuristic_cleared(nums), nums.copy(), [])]
         best_score = frontier[0][0]
         best_path = []
 
@@ -118,7 +118,9 @@ class Game:
                     child[top : bottom + 1, left : right + 1] = 0
                     child_cleared = self._heuristic_cleared(child)
                     new_path = path + [(top, bottom, left, right)]
-                    if child_cleared > best_score:
+                    if child_cleared > best_score or (
+                        child_cleared == best_score and len(new_path) > len(best_path)
+                    ):
                         best_score = child_cleared
                         best_path = new_path
                     next_frontier.append((child_cleared, child, new_path, cleared_cells))
@@ -127,8 +129,21 @@ class Game:
             next_frontier.sort(key=lambda x: (x[0], x[3]), reverse=True)
             frontier = [(c, b, p) for c, b, p, _ in next_frontier[:beam_width]]
 
-        for move in best_path:
-            self._apply_move(move)
+        return best_path
+
+    def _beam_solver(self, depth: int = 6, beam_width: int = 24):
+        while True:
+            moves = list(self._find_ten_rectangles(self.nums))
+            if not moves:
+                break
+
+            best_path = self._beam_step(self.nums, depth, beam_width)
+            if not best_path:
+                top, bottom, left, right, _ = max(moves, key=lambda m: m[4])
+                self._apply_move((top, bottom, left, right))
+            else:
+                for move in best_path:
+                    self._apply_move(move)
         return self.score
 
     def _apply_move(self, move):

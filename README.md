@@ -52,7 +52,7 @@ You can still select the original strategies via the `solver` argument:
 - `solver="basic"` – consume moves in discovery order.
 - `solver="greedy"`/`solver="algorithm1"` – always clear the rectangle with the most non-zero cells.
 - `solver="dfs"` – (default) look several moves ahead. Tweak depth/branching with `depth` and `branch_limit` arguments.
-- `solver="beam"` – run a beam search that keeps only the best few positions at each depth (`branch_limit` controls the beam width). This can reach deep solutions faster on large boards.
+- `solver="beam"` – run an iterative beam search that keeps only the best few positions at each depth (`branch_limit` controls the beam width). The search repeats until no rectangles remain, so it finishes the board; if a beam step finds no improving path it falls back to the largest-rectangle move.
 
 ## Generating a dataset of boards
 `generate_dataset.py` automates gameplay to build a dataset of captured boards for experimentation.
