@@ -6,7 +6,7 @@ from get_game import get_game
 
 
 class Game:
-    def __init__(self, game, gui=False):
+    def __init__(self, game, gui=True):
         self.H, self.W = 10, 17
         self.is_gui = gui
         self.game = game
@@ -43,8 +43,8 @@ class Game:
         pyautogui.moveTo(start_x, start_y)
         #pyautogui.dragTo(self.game[ex][ey].endx, self.game[ex][ey].endy,\
         #    math.sqrt(((ex-sx)**2) + ((ey-sy)**2))*0.5, button='left')
-        pyautogui.dragTo(end_x, end_y,\
-            math.sqrt(((ex-sx)**2) + ((ey-sy)**2))*0.5, button='left')
+        # pyautogui.dragTo(end_x, end_y, math.sqrt(((ex-sx)**2) + ((ey-sy)**2)), button='left')
+        pyautogui.dragTo(end_x, end_y, 0.5*math.sqrt(((ex-sx)**2) + ((ey-sy)**2))**0.5, button='left')
         print(f'Dragged from ({sx}, {sy}) to ({ex}, {ey})')
 
     def _compute_prefix_sums(self, nums: np.ndarray) -> np.ndarray:
@@ -170,19 +170,21 @@ def greedy(tens_idxs, game, depth=0):
 
 
 if __name__ == "__main__":
-    game = Game(get_game(confidence=0.975), False)
+    game = Game(get_game(confidence=0.975), True)
     c_game = copy.deepcopy(game)
-    c_game.solve("basic")
-    print(f"Naive: {c_game.score}")
+    c_game.is_gui = False
+    c_game.solve("dfs", depth=5, branch_limit=4)
+    c_game.print_game()
+    game.solve("dfs", depth=5, branch_limit=4)
 
-    best_score = 0
-    idxs = get_idxs(game)
-    while len(idxs) > 10:
-        idxs = get_idxs(game)
-        dx, s = greedy(idxs, game)
-        i, l, j, k = idxs[dx]
-        game._apply_move((i, l, j, k))
-        if s == best_score:
-            break
-        best_score = s
-    print(f"Greedy:{best_score}")
+    # best_score = 0
+    # idxs = get_idxs(game)
+    # while len(idxs) > 10:
+    #     idxs = get_idxs(game)
+    #     dx, s = greedy(idxs, game)
+    #     i, l, j, k = idxs[dx]
+    #     game._apply_move((i, l, j, k))
+    #     if s == best_score:
+    #         break
+    #     best_score = s
+    # print(f"Greedy:{best_score}")
