@@ -33,9 +33,17 @@ class Game:
         print()
     
     def drag(self, sx, sy, ex, ey):
-        pyautogui.moveTo(self.game[sx][sy].x-20, self.game[sx][sy].y-20)
-        pyautogui.dragTo(self.game[ex][ey].endx+20, self.game[ex][ey].endy+20,\
+        start_x = (self.game[sx][sy].x + self.game[sx][sy].endx)//2
+        start_y = (self.game[sx][sy].y + self.game[sx][sy].endy)//2
+        end_x = (self.game[ex][ey].x + self.game[ex][ey].endx)//2
+        end_y = (self.game[ex][ey].y + self.game[ex][ey].endy)//2
+        # pyautogui.moveTo(self.game[sx][sy].x, self.game[sx][sy].y)
+        pyautogui.moveTo(start_x, start_y)
+        #pyautogui.dragTo(self.game[ex][ey].endx, self.game[ex][ey].endy,\
+        #    math.sqrt(((ex-sx)**2) + ((ey-sy)**2))*0.5, button='left')
+        pyautogui.dragTo(end_x, end_y,\
             math.sqrt(((ex-sx)**2) + ((ey-sy)**2))*0.5, button='left')
+        print(self.game[sx][sy].x+5, self.game[sx][sy].y+5, '->', self.game[ex][ey].endx-5, self.game[ex][ey].endy-5)
     
     def solve(self, solver='basic'):
         #self.print_game()
@@ -59,12 +67,13 @@ class Game:
                                         self.score += len(np.nonzero(self.nums[i:i+y+1, j:j+x+1].reshape(-1))[0])
                                         self.nums[i:i+y+1, j:j+x+1] = np.zeros(self.nums[i:i+y+1, j:j+x+1].shape)
                                         self.update(i, y, j, x)
-                                        #self.print_game()
                                         new = True
+                                        self.print_game()
                                 x += 1
                             y += 1
                             x = 0
                             sum = np.sum(self.nums[i:i+y+1, j:j+x+1])
+                            
         elif solver=='algorithm1':
             new = True
             while new == True:
@@ -144,10 +153,11 @@ def greedy(tens_idxs, game, depth=0):
     return scores.index(max(scores)), max(scores)
        
 if __name__ == '__main__':
-    game = Game(get_game(confidence=0.8), False)
-    c_game = copy.deepcopy(game)
-    c_game.solve()
-    print(f'Naive: {c_game.score}')
+    game = Game(get_game(confidence=0.975), True)
+    # c_game = copy.deepcopy(game)
+    
+    # c_game.solve()
+    # print(f'Naive: {c_game.score}')
     
     best_score = 0
     idxs = get_idxs(game)

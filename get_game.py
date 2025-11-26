@@ -52,3 +52,4 @@ def get_game(confidence=0.8, save=False):
 if __name__ == '__main__':
     confidence = sys.argv[1] if len(sys.argv) > 1 else 0.8
     game = get_game(confidence)
+    print(game)
