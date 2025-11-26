@@ -140,7 +140,7 @@ class Game:
                     next_frontier.append((child_cleared, child, new_path, cleared_cells))
             if not next_frontier:
                 break
-            next_frontier.sort(key=lambda x: (x[0], x[3]), reverse=True)
+            next_frontier.sort(key=lambda x: (x[0], -x[3]), reverse=True)
             frontier = [(c, b, p) for c, b, p, _ in next_frontier[:beam_width]]
 
         return best_path
