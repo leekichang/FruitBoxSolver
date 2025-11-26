@@ -279,23 +279,9 @@ def greedy(tens_idxs, game, depth=0):
 
 if __name__ == "__main__":
     game = Game(get_game(confidence=0.975), True)
-    c_game = copy.deepcopy(game)
-    c_game.is_gui = False
-    c_game.solve(solver="beam", depth=6, branch_limit=8)
-    print(f"Beam:{c_game.score}")
-    if c_game.score > 130:
-        game.solve(solver="beam", depth=6, branch_limit=8)
-    else:
-        c_game = copy.deepcopy(game)
-        c_game.is_gui = False
-        c_game.solve(solver="dfs", depth=4, branch_limit=4)
-        print(f"DFS:{c_game.score}")
-        if c_game.score > game.score:
-            game.solve(solver="dfs", depth=4, branch_limit=4)
-            print(f"DFS:{game.score}")
-        else:
-            print("Not good enough for DFS")
-            exit()
+    game.solve(solver="dfs", depth=3, branch_limit=3)
+    print(f"DFS:{game.score}")
+        
 
     # best_score = 0
     # idxs = get_idxs(game)
