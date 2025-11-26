@@ -79,18 +79,32 @@ class Game:
     def _hash_board(self, nums: np.ndarray) -> bytes:
         return nums.tobytes()
 
+    def _greedy_min_rollout(self, nums: np.ndarray) -> int:
+        board = np.array(nums, copy=True)
+        cleared = self.total_cells - int(np.count_nonzero(board))
+
+        while True:
+            moves = list(self._find_ten_rectangles(board))
+            if not moves:
+                break
+
+            top, bottom, left, right, cleared_cells = min(moves, key=lambda m: m[4])
+            cleared += cleared_cells
+            board[top : bottom + 1, left : right + 1] = 0
+
+        return cleared
+
     def _search(self, nums: np.ndarray, depth: int, memo: dict, branch_limit: int = 4):
         key = (self._hash_board(nums), depth)
         if key in memo:
             return memo[key]
 
-        cleared_so_far = self.total_cells - int(np.count_nonzero(nums))
         moves = sorted(self._find_ten_rectangles(nums), key=lambda m: m[4])
         if depth == 0 or not moves:
-            memo[key] = (cleared_so_far, None)
+            memo[key] = (self._greedy_min_rollout(nums), None)
             return memo[key]
 
-        best_score = cleared_so_far
+        best_score = -1
         best_move = None
         for top, bottom, left, right, _ in moves[:branch_limit]:
             child = np.array(nums, copy=True)
