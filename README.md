@@ -19,7 +19,7 @@ pip install -r requirements.txt
 ## Repository layout
 - `Apple.py` – simple data class that stores the value and screen position of each apple tile.
 - `get_game.py` – captures the current screen, locates all apple images in `figure/`, and returns a `10 x 17` grid of `Apple` instances representing the board.
-- `Game.py` – solver logic that searches for rectangular regions summing to 10, optionally dragging over them in the UI to play the move.
+- `Game.py` – solver logic that searches for rectangular regions summing to 10, optionally dragging over them in the UI to play the move. Includes DFS, greedy, and beam-search variants.
 - `generate_dataset.py` – repeatedly starts a new game, captures the board, saves it to `games/`, and resets for the next sample.
 - `figure/` – template images used by `pyautogui` to locate tiles and buttons.
 
@@ -52,6 +52,7 @@ You can still select the original strategies via the `solver` argument:
 - `solver="basic"` – consume moves in discovery order.
 - `solver="greedy"`/`solver="algorithm1"` – always clear the rectangle with the most non-zero cells.
 - `solver="dfs"` – (default) look several moves ahead. Tweak depth/branching with `depth` and `branch_limit` arguments.
+- `solver="beam"` – run an iterative beam search that keeps only the best few positions at each depth (`branch_limit` controls the beam width). The search repeats until no rectangles remain, so it finishes the board; if a beam step finds no improving path it falls back to the largest-rectangle move.
 
 ## Generating a dataset of boards
 `generate_dataset.py` automates gameplay to build a dataset of captured boards for experimentation.
