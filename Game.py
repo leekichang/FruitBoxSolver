@@ -1,5 +1,6 @@
 import importlib
 import math
+import random
 import copy
 import pyautogui
 import numpy as np
@@ -33,17 +34,12 @@ class Game:
         print()
 
     def drag(self, sx, sy, ex, ey):
-        start_x = (self.game[sx][sy].x + self.game[sx][sy].endx)//2
-        start_y = (self.game[sx][sy].y + self.game[sx][sy].endy)//2
-        end_x = (self.game[ex][ey].x + self.game[ex][ey].endx)//2
-        end_y = (self.game[ex][ey].y + self.game[ex][ey].endy)//2
-        # pyautogui.moveTo(self.game[sx][sy].x, self.game[sx][sy].y)
+        start_x = (self.game[sx][sy].x + self.game[sx][sy].endx) // 2
+        start_y = (self.game[sx][sy].y + self.game[sx][sy].endy) // 2
+        end_x = (self.game[ex][ey].x + self.game[ex][ey].endx) // 2
+        end_y = (self.game[ex][ey].y + self.game[ex][ey].endy) // 2
         pyautogui.moveTo(start_x, start_y)
-        #pyautogui.dragTo(self.game[ex][ey].endx, self.game[ex][ey].endy,\
-        #    math.sqrt(((ex-sx)**2) + ((ey-sy)**2))*0.5, button='left')
-        # pyautogui.dragTo(end_x, end_y, math.sqrt(((ex-sx)**2) + ((ey-sy)**2)), button='left')
-        pyautogui.dragTo(end_x, end_y, 0.5*math.sqrt(((ex-sx)**2) + ((ey-sy)**2))**0.5, button='left')
-        # print(f'Dragged from ({sx}, {sy}) to ({ex}, {ey})')
+        pyautogui.dragTo(end_x, end_y, 0.5 * math.sqrt(((ex - sx) ** 2) + ((ey - sy) ** 2)) ** 0.5, button="left")
 
     def _compute_prefix_sums(self, nums: np.ndarray) -> np.ndarray:
         return np.cumsum(nums, axis=0, dtype=np.int32)
@@ -80,6 +76,9 @@ class Game:
     def _hash_board(self, nums: np.ndarray) -> bytes:
         return nums.tobytes()
 
+    def _heuristic_cleared(self, nums: np.ndarray) -> int:
+        return self.total_cells - int(np.count_nonzero(nums))
+
     def _greedy_min_rollout(self, nums: np.ndarray) -> int:
         board = np.array(nums, copy=True)
         cleared = self.total_cells - int(np.count_nonzero(board))
@@ -89,6 +88,7 @@ class Game:
             if not moves:
                 break
 
+            # Always pick the move that clears the fewest non-zero cells.
             top, bottom, left, right, cleared_cells = min(moves, key=lambda m: m[4])
             cleared += cleared_cells
             board[top : bottom + 1, left : right + 1] = 0
@@ -100,25 +100,25 @@ class Game:
         if key in memo:
             return memo[key]
 
-        moves = sorted(self._find_ten_rectangles(nums), key=lambda m: m[4])
+        moves = list(self._find_ten_rectangles(nums))
+        random.shuffle(moves)
+        moves.sort(key=lambda m: m[4])
         if depth == 0 or not moves:
-            memo[key] = (self._greedy_min_rollout(nums), None)
+            memo[key] = (self._greedy_min_rollout(nums), [])
             return memo[key]
 
         best_score = -1
-        best_move = None
+        best_path = []
         for top, bottom, left, right, _ in moves[:branch_limit]:
             child = np.array(nums, copy=True)
             child[top : bottom + 1, left : right + 1] = 0
-            child_score, _ = self._search(child, depth - 1, memo, branch_limit)
+            child_score, child_path = self._search(child, depth - 1, memo, branch_limit)
             if child_score > best_score:
                 best_score = child_score
-                best_move = (top, bottom, left, right)
-        memo[key] = (best_score, best_move)
-        return memo[key]
+                best_path = [(top, bottom, left, right)] + child_path
 
-    def _heuristic_cleared(self, nums: np.ndarray) -> int:
-        return self.total_cells - int(np.count_nonzero(nums))
+        memo[key] = (best_score, best_path)
+        return memo[key]
 
     def _beam_step(self, nums: np.ndarray, depth: int, beam_width: int):
         frontier = [(self._heuristic_cleared(nums), nums.copy(), [])]
@@ -235,13 +235,37 @@ class Game:
             self._apply_move((top, bottom, left, right))
         return self.score
 
-    def _dfs_solver(self, depth: int = 4, branch_limit: int = 4):
+    def _calculate_search_params(self, depth: int, branch_limit: int, max_depth: int, max_branch: int):
+        fullness = np.count_nonzero(self.nums) / float(self.total_cells)
+        adaptive_depth = int(round(depth + (1 - fullness) * max(0, max_depth - depth)))
+        adaptive_branch = int(round(branch_limit + (1 - fullness) * max(0, max_branch - branch_limit)))
+        adaptive_depth = max(1, min(adaptive_depth, max_depth))
+        adaptive_branch = max(1, min(adaptive_branch, max_branch))
+        return adaptive_depth, adaptive_branch
+
+    def _plan_dfs(self, nums: np.ndarray, depth: int, branch_limit: int):
         memo = {}
-        while True:
-            _, best_move = self._search(self.nums, depth, memo, branch_limit)
-            if best_move is None:
-                break
-            self._apply_move(best_move)
+        score, path = self._search(nums, depth, memo, branch_limit)
+        return score, path
+
+    def _dfs_solver(self, depth: int = 4, branch_limit: int = 4, num_runs: int = 6, max_depth: int = 8, max_branch: int = 8):
+        best_score = -1
+        best_path = []
+        base_board = np.array(self.nums, copy=True)
+
+        for run_idx in range(num_runs):
+            random.seed()
+            board_copy = np.array(base_board, copy=True)
+            adaptive_depth, adaptive_branch = self._calculate_search_params(
+                depth, branch_limit, max_depth, max_branch
+            )
+            score, path = self._plan_dfs(board_copy, adaptive_depth, adaptive_branch)
+            if score > best_score:
+                best_score = score
+                best_path = path
+
+        for move in best_path:
+            self._apply_move(move)
         return self.score
 
     def solve(self, solver="dfs", depth: int = 4, branch_limit: int = 4):
@@ -281,7 +305,6 @@ if __name__ == "__main__":
     game = Game(get_game(confidence=0.975), True)
     game.solve(solver="dfs", depth=3, branch_limit=3)
     print(f"DFS:{game.score}")
-        
 
     # best_score = 0
     # idxs = get_idxs(game)
