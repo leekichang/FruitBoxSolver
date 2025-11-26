@@ -11,11 +11,8 @@ class Game:
         self.is_gui = gui
         self.game = game
         self.score = 0
-        self.nums = np.ndarray(game.shape)
+        self.nums = np.array([[cell.num for cell in row] for row in game], dtype=np.int16)
         self.total_cells = self.H * self.W
-        for i in range(self.H):
-            for j in range(self.W):
-                self.nums[i][j] = self.game[i][j].num
 
     def update(self, i, y, j, x):
         for idx in range(y + 1):
@@ -48,7 +45,7 @@ class Game:
         print(f'Dragged from ({sx}, {sy}) to ({ex}, {ey})')
 
     def _compute_prefix_sums(self, nums: np.ndarray) -> np.ndarray:
-        return np.cumsum(nums, axis=0)
+        return np.cumsum(nums, axis=0, dtype=np.int32)
 
     def _rectangle_sum(self, prefix: np.ndarray, top: int, bottom: int) -> np.ndarray:
         if top == 0:
@@ -56,24 +53,27 @@ class Game:
         return prefix[bottom] - prefix[top - 1]
 
     def _find_ten_rectangles(self, nums: np.ndarray):
-        prefix = self._compute_prefix_sums(nums)
+        prefix_values = self._compute_prefix_sums(nums)
+        prefix_nonzero = self._compute_prefix_sums((nums != 0).astype(np.uint8))
         for top in range(self.H):
             for bottom in range(top, self.H):
-                col_sums = self._rectangle_sum(prefix, top, bottom)
+                col_sums = self._rectangle_sum(prefix_values, top, bottom)
+                col_nonzero = self._rectangle_sum(prefix_nonzero, top, bottom)
                 left = 0
                 current_sum = 0
-                for right, value in enumerate(col_sums):
-                    current_sum += value
+                current_nonzero = 0
+                for right in range(len(col_sums)):
+                    current_sum += col_sums[right]
+                    current_nonzero += col_nonzero[right]
                     while current_sum > 10 and left <= right:
                         current_sum -= col_sums[left]
+                        current_nonzero -= col_nonzero[left]
                         left += 1
                     while current_sum == 10 and left <= right:
-                        cleared_cells = int(
-                            np.count_nonzero(nums[top : bottom + 1, left : right + 1])
-                        )
-                        if cleared_cells > 0:
-                            yield (top, bottom, left, right, cleared_cells)
+                        if current_nonzero > 0:
+                            yield (top, bottom, left, right, int(current_nonzero))
                         current_sum -= col_sums[left]
+                        current_nonzero -= col_nonzero[left]
                         left += 1
 
     def _hash_board(self, nums: np.ndarray) -> bytes:
@@ -101,6 +101,35 @@ class Game:
                 best_move = (top, bottom, left, right)
         memo[key] = (best_score, best_move)
         return memo[key]
+
+    def _heuristic_cleared(self, nums: np.ndarray) -> int:
+        return self.total_cells - int(np.count_nonzero(nums))
+
+    def _beam_solver(self, depth: int = 6, beam_width: int = 24):
+        frontier = [(self._heuristic_cleared(self.nums), self.nums.copy(), [])]
+        best_score = frontier[0][0]
+        best_path = []
+
+        for _ in range(depth):
+            next_frontier = []
+            for cleared, board, path in frontier:
+                for top, bottom, left, right, cleared_cells in self._find_ten_rectangles(board):
+                    child = np.array(board, copy=True)
+                    child[top : bottom + 1, left : right + 1] = 0
+                    child_cleared = self._heuristic_cleared(child)
+                    new_path = path + [(top, bottom, left, right)]
+                    if child_cleared > best_score:
+                        best_score = child_cleared
+                        best_path = new_path
+                    next_frontier.append((child_cleared, child, new_path, cleared_cells))
+            if not next_frontier:
+                break
+            next_frontier.sort(key=lambda x: (x[0], x[3]), reverse=True)
+            frontier = [(c, b, p) for c, b, p, _ in next_frontier[:beam_width]]
+
+        for move in best_path:
+            self._apply_move(move)
+        return self.score
 
     def _apply_move(self, move):
         top, bottom, left, right = move
@@ -147,6 +176,8 @@ class Game:
             return self._greedy_solver()
         if solver == "dfs":
             return self._dfs_solver(depth=depth, branch_limit=branch_limit)
+        if solver == "beam":
+            return self._beam_solver(depth=depth, beam_width=branch_limit)
         raise ValueError(f"Unknown solver type: {solver}")
 
 
