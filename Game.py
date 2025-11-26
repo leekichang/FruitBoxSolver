@@ -42,7 +42,7 @@ class Game:
         #    math.sqrt(((ex-sx)**2) + ((ey-sy)**2))*0.5, button='left')
         # pyautogui.dragTo(end_x, end_y, math.sqrt(((ex-sx)**2) + ((ey-sy)**2)), button='left')
         pyautogui.dragTo(end_x, end_y, 0.5*math.sqrt(((ex-sx)**2) + ((ey-sy)**2))**0.5, button='left')
-        print(f'Dragged from ({sx}, {sy}) to ({ex}, {ey})')
+        # print(f'Dragged from ({sx}, {sy}) to ({ex}, {ey})')
 
     def _compute_prefix_sums(self, nums: np.ndarray) -> np.ndarray:
         return np.cumsum(nums, axis=0, dtype=np.int32)
@@ -219,9 +219,21 @@ if __name__ == "__main__":
     game = Game(get_game(confidence=0.975), True)
     c_game = copy.deepcopy(game)
     c_game.is_gui = False
-    c_game.solve("dfs", depth=5, branch_limit=4)
-    c_game.print_game()
-    game.solve("dfs", depth=5, branch_limit=4)
+    c_game.solve(solver="beam", depth=6, branch_limit=8)
+    print(f"Beam:{c_game.score}")
+    if c_game.score > 130:
+        game.solve(solver="beam", depth=6, branch_limit=8)
+    else:
+        c_game = copy.deepcopy(game)
+        c_game.is_gui = False
+        c_game.solve(solver="dfs", depth=4, branch_limit=4)
+        print(f"DFS:{c_game.score}")
+        if c_game.score > game.score:
+            game.solve(solver="dfs", depth=4, branch_limit=4)
+            print(f"DFS:{game.score}")
+        else:
+            print("Not good enough for DFS")
+            exit()
 
     # best_score = 0
     # idxs = get_idxs(game)
